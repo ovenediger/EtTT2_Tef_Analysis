@@ -1,0 +1,321 @@
+---
+title: "Tef Project"
+output: html_notebook
+---
+
+First heatmap using native function, produces dendrogram and maps percentage identity, however, lacks y axis labels to demonstrate sequence comparison.
+
+```{r}
+#Establishes dataset and matrix in R environment
+data = as.matrix(X_ID_Matrix)
+heatmap(data)
+```
+
+Added y axis labels. However, native heatmap function lacks formatting complexity.
+
+```{r}
+#Establishes dataset as matrix in R environment
+data = as.matrix(X_ID_Matrix)
+
+#Setting row names to character values to show on heatmap
+data_rows <- c("Musa_accumata",
+               "Sorghum_bicolor",
+               "Oryza_sativa",
+               "Triticum_aestivum",
+               "Eragrostis_Tef_4A",
+               "Eragrostis_Tef_4B",
+               "Arabidopsis_Thaliana",
+               "Brassica_Napus",
+               "Medicago_Truncatula",
+               "Gossypium_raimondii"
+               )
+row.names(data) <- data_rows
+
+heatmap(data)
+```
+
+Exploring ggplot heatmap function to draw, used GAI (CoPilot) to assist. Allows more customisation on formatting, however lacks dendrogram function which is particularly useful to the figure. When setting color scheme, we would aim to have the scale go from 0-100% rather than setting the midpoint to the median value in the dataset. GAI also decided that further manipulation of the matrix to long format was necessary for ggplot function, my previous experience with ggplot suggests this is the right move, however it may not be the most efficient. Ultimately, the efficiency of this chunk is irrelevant as no detail is lost by doing this, but it muddies the ease of interpreting the code.
+
+```{r}
+#Loading packages: ggplot for heatmap, tidyr and dplyr for dataset manipulation
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+# Matrix and row names
+data <- as.matrix(X_ID_Matrix)
+data_rows <- c(
+  "Musa_accumata",
+  "Sorghum_bicolor",
+  "Oryza_sativa",
+  "Triticum_aestivum",
+  "Eragrostis_Tef_4A", "Eragrostis_Tef_4B",
+  "Arabidopsis_Thaliana",
+  "Brassica_Napus",
+  "Medicago_Truncatula",
+  "Gossypium_raimondii"
+)
+rownames(data) <- data_rows
+
+# Convert matrix to data frame with rownames as a column
+df <- as.data.frame(data) %>%
+  mutate(Species = rownames(data))
+
+# Long formatting matrix to suit ggplot heatmap plotting
+df_long <- df %>%
+  pivot_longer(
+    cols = -Species,
+    names_to = "Comparative",
+    values_to = "Value"
+  )
+#expressing df_long to check formatting
+df_long
+
+# Heatmap generation
+ggplot(df_long, #sets dataset
+       aes(x = Comparative, y = Species, fill = Value)) + #sets aesthetics for plot
+  geom_tile() + #sets style for geom_points to tiled
+  scale_fill_gradient2(
+    low = "navy",
+    mid = "white",
+    high = "firebrick3",
+    midpoint = median(df_long$Value, na.rm = TRUE) 
+  ) + #Sets color scheme, midpoint function sets the median value of the data set to white
+  theme_minimal() + #minimises formatting to clean up figure
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1), #rotates x axis text for reading
+    axis.text.y = element_text(size = 10), #setting text formatting
+    axis.title.x = element_blank(), #removing axis titles, unnecessary for heatmap figure
+    axis.title.y = element_blank()
+  )
+
+```
+
+Now experimenting with pretty heatmaps package, this will allow custom formatting similar to ggplot, while bringing back the dendrogram function, as well as annotations which mean we can distinguish taxonomy of species within the figure. This chunk also only requires the pheatmap package, as all data manipulation is run through R native functions.
+
+A key distinction that puts me in favour of this heatmap is the taxonomy annotations, this has been done manually, but it would be interesting to create an automated means to retrieve taxonomic data of ensembl plant entries - future project?...
+
+```{r}
+#Loading pretty heatmaps (pheatmap) package
+library(pheatmap)
+
+
+# Matrix and row names
+data <- as.matrix(X_ID_Matrix)
+data_rows <- c(
+  "Arabidopsis_thaliana",
+  "Brassica_napus",
+  "Medicago_truncatula",
+  "Triticum_aestivum",
+  "Oryza_sativa",
+  "Sorghum_bicolor",
+  "Gossypium_raimondii",
+  "Musa_acuminata",
+  "Eragrostis_tef_4A",
+  "Eragrostis_tef_4B"
+)
+rownames(data) <- data_rows
+
+#Setting colour scale for datapoints, (100) dictates a range that the colour gradient exists in
+color = colorRampPalette(c("blue", "white", "red"))(100)
+
+#Makes scale go from 0 to 100%, otherwise format would range between min and max values in matrix
+breaks = c(0:100)
+
+
+#Delineating the crops clade by creating a vector called clade_type with clade information, I have to assign these manually, would be good to have automated assignment
+clade_type <- c(
+  "Dicot",    # AT
+  "Dicot",    # BN
+  "Dicot",    # MT
+  "Monocot",  # TA
+  "Monocot",  # OS
+  "Monocot",  # SB
+  "Dicot",    # GR
+  "Monocot",  # MA
+  "Monocot",    # ET4A
+  "Monocot"     # ET4B
+)
+
+#Creates annotations dataframe using the clade_type vector and column names from matrix
+annotations <- data.frame(
+  Clade = clade_type
+)
+row.names(annotations) <- colnames(data) #Assigns the clade to the annotations dataframe, using the column names of the matrix as a reference. This wouldn't work if the clade_type/matrix columns were reordered.
+
+#Assigns clade value to a colour using annotation_crop_colors array
+annotation_crop_colors <- list( Clade = c( Monocot = "black", # Black
+                                          Dicot = "#33a02c" # green
+)) 
+
+
+#Producing heatmap
+pheatmap(data, #Sets data for plot
+         angle_col = 45, #Sets angle of column labels for readability
+         color = color, #Sets color scheme of data points to pre-assigned palette variable
+         breaks = breaks, #Sets breaks value to scale assigned as breaks variable
+         annotation_col = annotations, #Sets column annotations to annotations dataframe
+         annotation_row = annotations, #Sets row annotations to annotations dataframe
+         annotation_colors = annotation_crop_colors, #Formats annotation colours to annotation_crop_colors array
+         cluster_rows = TRUE, #Clusters rows, allows sensible dendrogram 
+         cluster_cols = TRUE, #Clusters columns, allows sensible dendrogram
+         cellwidth = 20,
+         cellheight = 20,
+         legend = TRUE) #Produces legend to interpret figure
+```
+
+Going to create similar heatmap, displaying the percentage identity matrix of the amino acid sequence of the investigated genes. May reveal closer functional correlations of the gene.
+
+```{r}
+#Loading pretty heatmaps (pheatmap) package
+library(pheatmap)
+
+
+# Matrix and addition of species row names
+AAdata <- as.matrix(AA_ID_Matrix)
+AAdata_rows <- c(
+  "Arabidopsis_thaliana",
+  "Brassica_napus",
+  "Medicago_truncatula",
+  "Triticum_aestivum",
+  "Oryza_sativa",
+  "Sorghum_bicolor",
+  "Gossypium_raimondii",
+  "Musa_acuminata",
+  "Eragrostis_tef_4A",
+  "Eragrostis_tef_4B"
+)
+
+rownames(AAdata) <- AAdata_rows
+
+#Setting colour scale for datapoints, (100) dictates a range that the colour gradient exists in
+color = colorRampPalette(c("blue", "white", "red"))(100)
+
+#Makes scale go from 0 to 100%, otherwise format would range between min and max values in matrix
+breaks = c(0:100)
+
+#Delineating the crops clade by creating a vector called clade_type with clade information
+AAclade_type <- c(
+  "Dicot",    # AT
+  "Dicot",    # BN
+  "Dicot",    # MT
+  "Monocot",  # TA
+  "Monocot",  # OS
+  "Monocot",  # SB
+  "Dicot",    # GR
+  "Monocot",  # MA
+  "Monocot",  # ET4A
+  "Monocot"   # ET4B
+)
+
+#Creates annotations dataframe using the clade_type vector and column names from matrix
+AAannotations <- data.frame(
+  Clade = AAclade_type
+)
+row.names(AAannotations) <- colnames(AAdata) #Assigns the clade to the annotations dataframe, using the column names of the matrix as a reference.
+
+#Assigns clade value to a colour using annotation_crop_colors array
+AAannotation_crop_colors <- list( Clade = c( Monocot = "black", # Black
+                                          Dicot = "#33a02c" # green
+))
+
+#Producing heatmap
+pheatmap(AAdata, #Sets data for plot
+         angle_col = 45, #Sets angle of column labels for readability
+         color = color, #Sets color scheme of data points to pre-assigned palette
+         breaks = breaks, #Sets breaks value to scale assigned by breaks vector
+         annotation_col = AAannotations, #Sets column annotations to annotations dataframe
+         annotation_row = AAannotations, #Sets row annotations to annotations dataframe
+         annotation_colors = AAannotation_crop_colors, #Formats annotation colours to annotation_crop_colors array
+         cluster_rows = TRUE, #Clusters rows, allows sensible dendrogram 
+         cluster_cols = TRUE, #Clusters columns, allows sensible dendrogram
+         cellwidth = 20,
+         cellheight = 20,
+         legend = TRUE) #Produces legend to interpret figure
+```
+
+
+Decided to create a similar heatmap using TM-score and alphafold. Uses buckets instead of gradient colour scheme.
+
+```{r}
+library(pheatmap)
+library(dplyr)
+
+
+# Matrix and row names
+fold_data <- as.matrix(TM_align_matrix)
+
+fold_data_rows <- c(
+  "Musa_accumata",
+  "Sorghum_bicolor",
+  "Oryza_sativa",
+  "Triticum_aestivum",
+  "Eragrostis_tef_4A",
+  "Eragrostis_tef_4B",
+  "Arabidopsis_thaliana",
+  "Brassica_napus",
+  "Medicago_truncatula",
+  "Gossypium_raimondii"
+)
+#Applying species name to fold_data matrix
+rownames(fold_data) <- fold_data_rows
+
+#Colour scheme
+breaks2 <- c(seq(0, 0.25, length.out = 26),
+                    seq(0.25, 0.50, length.out = 26)[-1],
+                    seq(0.50, 0.75, length.out = 26)[-1],
+                    seq(0.75, 1.00, length.out = 26)[-1] )
+
+breaks2 <- c(0, 0.3, 0.50, 1.00)
+
+colors2 <- c(
+  "#7AA2C4",      # bucket 1
+  "white",     # bucket 2
+  "red"        # bucket 3
+)
+
+
+#Delineating the crop types
+fold_crop_type <- c( 
+  "Monocot",  # Musa_accuminata
+  "Monocot",  # Sorghum_bicolor
+  "Monocot",  # Oryza_sativa
+  "Monocot",  # Triticum_aestivum
+  "Monocot",  # Eragrostis_tef_4A
+  "Monocot",  # Eragrostis_tef_4B
+  "Dicot",    # Arabidopsis_thaliana
+  "Dicot",    # Brassica_napus
+  "Dicot",    # Medicago_truncatula
+  "Dicot"     # Gossypium_raimondii
+)
+
+#Creating dataframe to apply annotations with colour against clade
+fold_annotations <- data.frame(
+  Clade = fold_crop_type
+)
+row.names(fold_annotations) <- colnames(fold_data)
+
+#Creating colour scheme to apply to annotations later
+fold_annotation_crop_colors <- list( Clade = c( Monocot = "black", # Black
+                                          Dicot = "#33a02c" # green
+))
+
+#Heatmap
+pheatmap(fold_data, 
+         angle_col = 45,
+         color = colors2,
+         breaks = breaks2,
+         annotation_col = fold_annotations,
+         annotation_row = fold_annotations,
+         annotation_colors = fold_annotation_crop_colors,
+         annotation_names_row = TRUE,
+         annotation_names_col = TRUE,
+         cluster_rows = FALSE,
+         cluster_cols = FALSE,
+         display_numbers = TRUE,
+         cellwidth = 20,
+         cellheight = 20,
+         legend = TRUE)
+
+
+```
