@@ -10,3 +10,5 @@ AA_ID_Matrix.xlxs was used to generate a heatmap figure in report, contains %ID 
 TM_Align_matrix.csv was used to generate a heatmap figure in report, contains TM Score of aligned predictive folds from selected TT2 orthologues
 
 HeatmapsFinal.Rmd is R Notebook containing code used to generate heatmap figures in report.
+
+This project is no longer being updated. Contact for support or queries.
